@@ -15,6 +15,9 @@ set -e
 PROJECT_ROOT="$HOME/bifu-projects"
 cd "$PROJECT_ROOT"
 
+# Maven settings.xml 配置文件路径
+MAVEN_SETTINGS="$PROJECT_ROOT/.mvn/settings.xml"
+
 # DaoCloud 镜像加速器
 DAOCLOUD_MIRROR="docker.m.daocloud.io"
 
@@ -244,7 +247,13 @@ build_maven_lib() {
     log_step "构建 Maven 库: $service"
     cd "$PROJECT_ROOT/$service"
     
-    mvn clean install -DskipTests -q
+    # 检查是否有 protobuf 插件配置
+    if grep -q "protobuf-maven-plugin" pom.xml 2>/dev/null; then
+        log_info "检测到 protobuf 插件，先执行 protobuf:compile"
+        mvn protobuf:compile -s "$MAVEN_SETTINGS" || log_warn "protobuf 编译可能失败"
+    fi
+    
+    mvn clean install -DskipTests -s "$MAVEN_SETTINGS"
     log_info "Maven 库构建完成: $service"
 }
 
@@ -254,8 +263,14 @@ build_maven() {
     log_step "构建 Maven 项目: $service"
     cd "$PROJECT_ROOT/$service"
     
-    # 先编译
-    mvn clean package -DskipTests -q
+    # 检查是否有 protobuf 插件配置
+    if grep -q "protobuf-maven-plugin" pom.xml 2>/dev/null; then
+        log_info "检测到 protobuf 插件，先执行 protobuf:compile"
+        mvn protobuf:compile -s "$MAVEN_SETTINGS" || log_warn "protobuf 编译可能失败"
+    fi
+    
+    # 编译打包
+    mvn clean package -DskipTests -s "$MAVEN_SETTINGS"
     
     # 再构建 Docker 镜像
     if [ -f "Dockerfile" ]; then

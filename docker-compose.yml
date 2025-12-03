@@ -89,7 +89,7 @@ services:
     environment:
       JAVA_OPTS: "-Drocketmq.namesrv.addr=rocketmq-namesrv:9876"
     ports:
-      - "8081:8080"
+      - "8081:8082"
     depends_on:
       - rocketmq-namesrv
       - rocketmq-broker
@@ -118,17 +118,18 @@ services:
     container_name: mysql
     image: "mysql:8.0-oracle"
     environment:
-      MYSQL_ROOT_PASSWORD: root123456
+      MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: bifu
     ports:
       - "3306:3306"
     volumes:
       - mysql-data:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d
     command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     networks:
       - bifu-network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -138,7 +139,7 @@ services:
     container_name: xxl-job-admin
     image: "xuxueli/xxl-job-admin:2.4.0"
     environment:
-      PARAMS: "--spring.datasource.url=jdbc:mysql://mysql:3306/xxl_job?useUnicode=true&characterEncoding=UTF-8&autoReconnect=true&serverTimezone=Asia/Shanghai --spring.datasource.username=root --spring.datasource.password=root123456"
+      PARAMS: "--spring.datasource.url=jdbc:mysql://mysql:3306/xxl_job?useUnicode=true&characterEncoding=UTF-8&autoReconnect=true&serverTimezone=Asia/Shanghai --spring.datasource.username=root --spring.datasource.password=root"
     ports:
       - "8082:8080"
     depends_on:
@@ -188,8 +189,12 @@ services:
     image: "spot-trade-server:latest"
     environment:
       SPRING_PROFILES_ACTIVE: "localtest"
+      SPRING_APPLICATION_NAME: "spot-trade-server"
+      JAVA_TOOL_OPTIONS: "-Dspot.trade.shard.current-server-id=spot-trade-server -Dspot.trade.shard.server-id-to-managed-shard-id-map.spot-trade-server=0x00-0xff -Djraft.data-path=/data/jraft/"
       NACOS_CONFIG_SERVER_ADDR: "nacos:8848"
       SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR: "nacos:8848"
+      SPRING_CLOUD_NACOS_CONFIG_ENABLED: "false"
+      UNIMARGIN_COMMON_META_DATA_LOADER: "resource"
       ROCKETMQ_NAMESRV_ADDR: "rocketmq-namesrv:9876"
       JVM_OPT_XMX: "512m"
       JVM_OPT_XMS: "256m"
@@ -210,6 +215,11 @@ services:
       SPRING_PROFILES_ACTIVE: "localtest"
       NACOS_CONFIG_SERVER_ADDR: "nacos:8848"
       SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR: "nacos:8848"
+      SPRING_CLOUD_NACOS_CONFIG_ENABLED: "false"
+      NACOS_DISCOVERY_ENABLED: "true"
+      NACOS_DISCOVERY_SERVER_ADDR: "nacos:8848"
+      UNIMARGIN_COMMON_META_DATA_LOADER: "resource"
+      SPRING_REDIS_URL: "redis://redis:6379"
       ROCKETMQ_NAMESRV_ADDR: "rocketmq-namesrv:9876"
       JVM_OPT_XMX: "512m"
       JVM_OPT_XMS: "256m"
@@ -217,6 +227,7 @@ services:
     ports:
       - "9010:9010"
     depends_on:
+      - redis
       - rocketmq-namesrv
       - rocketmq-broker
     networks:
@@ -246,7 +257,9 @@ services:
       SPRING_PROFILES_ACTIVE: "localtest"
       NACOS_CONFIG_SERVER_ADDR: "nacos:8848"
       SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR: "nacos:8848"
+      SPRING_REDIS_URL: "redis://redis:6379"
       SPRING_REDIS_HOST: "redis"
+      SPRING_REDIS_PORT: "6379"
       ROCKETMQ_NAMESRV_ADDR: "rocketmq-namesrv:9876"
       JVM_OPT_XMX: "512m"
       JVM_OPT_XMS: "256m"
@@ -267,8 +280,15 @@ services:
       SPRING_PROFILES_ACTIVE: "localtest"
       NACOS_CONFIG_SERVER_ADDR: "nacos:8848"
       SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR: "nacos:8848"
+      SPRING_CLOUD_NACOS_CONFIG_ENABLED: "false"
+      NACOS_DISCOVERY_ENABLED: "true"
+      NACOS_DISCOVERY_SERVER_ADDR: "nacos:8848"
+      UNIMARGIN_COMMON_META_DATA_LOADER: "resource"
       SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/bifu?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai"
-      SPRING_REDIS_HOST: "redis"
+      SPRING_DATASOURCE_USERNAME: "root"
+      SPRING_DATASOURCE_PASSWORD: "root"
+      SPRING_REDIS_FOR_STORAGE_URL: "redis://redis:6379"
+      SPRING_REDIS_FOR_CACHE_URL: "redis://redis:6379"
       ROCKETMQ_NAMESRV_ADDR: "rocketmq-namesrv:9876"
       JVM_OPT_XMX: "512m"
       JVM_OPT_XMS: "256m"
@@ -290,6 +310,10 @@ services:
       SPRING_PROFILES_ACTIVE: "localtest"
       NACOS_CONFIG_SERVER_ADDR: "nacos:8848"
       SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR: "nacos:8848"
+      SPRING_CLOUD_NACOS_CONFIG_ENABLED: "false"
+      NACOS_DISCOVERY_ENABLED: "true"
+      NACOS_DISCOVERY_SERVER_ADDR: "nacos:8848"
+      UNIMARGIN_COMMON_META_DATA_LOADER: "resource"
       ROCKETMQ_NAMESRV_ADDR: "rocketmq-namesrv:9876"
       JVM_OPT_XMX: "512m"
       JVM_OPT_XMS: "256m"
@@ -310,6 +334,10 @@ services:
       SPRING_PROFILES_ACTIVE: "localtest"
       NACOS_CONFIG_SERVER_ADDR: "nacos:8848"
       SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR: "nacos:8848"
+      SPRING_CLOUD_NACOS_CONFIG_ENABLED: "false"
+      NACOS_DISCOVERY_ENABLED: "true"
+      NACOS_DISCOVERY_SERVER_ADDR: "nacos:8848"
+      UNIMARGIN_COMMON_META_DATA_LOADER: "resource"
       ROCKETMQ_NAMESRV_ADDR: "rocketmq-namesrv:9876"
       JVM_OPT_XMX: "512m"
       JVM_OPT_XMS: "256m"
@@ -330,6 +358,10 @@ services:
       SPRING_PROFILES_ACTIVE: "localtest"
       NACOS_CONFIG_SERVER_ADDR: "nacos:8848"
       SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR: "nacos:8848"
+      SPRING_CLOUD_NACOS_CONFIG_ENABLED: "false"
+      NACOS_DISCOVERY_ENABLED: "true"
+      NACOS_DISCOVERY_SERVER_ADDR: "nacos:8848"
+      UNIMARGIN_COMMON_META_DATA_LOADER: "resource"
       ROCKETMQ_NAMESRV_ADDR: "rocketmq-namesrv:9876"
       JVM_OPT_XMX: "512m"
       JVM_OPT_XMS: "256m"
@@ -350,6 +382,10 @@ services:
       SPRING_PROFILES_ACTIVE: "localtest"
       NACOS_CONFIG_SERVER_ADDR: "nacos:8848"
       SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR: "nacos:8848"
+      SPRING_CLOUD_NACOS_CONFIG_ENABLED: "false"
+      NACOS_DISCOVERY_ENABLED: "true"
+      NACOS_DISCOVERY_SERVER_ADDR: "nacos:8848"
+      UNIMARGIN_COMMON_META_DATA_LOADER: "resource"
       JVM_OPT_XMX: "512m"
       JVM_OPT_XMS: "256m"
       SoftMaxHeapSize: "384m"
@@ -366,6 +402,10 @@ services:
       SPRING_PROFILES_ACTIVE: "localtest"
       NACOS_CONFIG_SERVER_ADDR: "nacos:8848"
       SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR: "nacos:8848"
+      SPRING_CLOUD_NACOS_CONFIG_ENABLED: "false"
+      NACOS_DISCOVERY_ENABLED: "true"
+      NACOS_DISCOVERY_SERVER_ADDR: "nacos:8848"
+      UNIMARGIN_COMMON_META_DATA_LOADER: "resource"
       ROCKETMQ_NAMESRV_ADDR: "rocketmq-namesrv:9876"
       JVM_OPT_XMX: "512m"
       JVM_OPT_XMS: "256m"
@@ -386,6 +426,10 @@ services:
       SPRING_PROFILES_ACTIVE: "localtest"
       NACOS_CONFIG_SERVER_ADDR: "nacos:8848"
       SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR: "nacos:8848"
+      SPRING_CLOUD_NACOS_CONFIG_ENABLED: "false"
+      NACOS_DISCOVERY_ENABLED: "true"
+      NACOS_DISCOVERY_SERVER_ADDR: "nacos:8848"
+      UNIMARGIN_COMMON_META_DATA_LOADER: "resource"
       JVM_OPT_XMX: "512m"
       JVM_OPT_XMS: "256m"
       SoftMaxHeapSize: "384m"
@@ -422,6 +466,11 @@ services:
       SPRING_PROFILES_ACTIVE: "localtest"
       NACOS_CONFIG_SERVER_ADDR: "nacos:8848"
       SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR: "nacos:8848"
+      SPRING_CLOUD_NACOS_CONFIG_ENABLED: "false"
+      NACOS_DISCOVERY_ENABLED: "true"
+      NACOS_DISCOVERY_SERVER_ADDR: "nacos:8848"
+      UNIMARGIN_COMMON_META_DATA_LOADER: "resource"
+      MM_SPOT_FILTER_ORDER_FILLS_ENABLED: "false"
       ROCKETMQ_NAMESRV_ADDR: "rocketmq-namesrv:9876"
       JVM_OPT_XMX: "512m"
       JVM_OPT_XMS: "256m"
