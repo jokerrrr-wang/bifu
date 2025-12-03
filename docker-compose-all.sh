@@ -18,6 +18,9 @@ cd "$PROJECT_ROOT"
 # DaoCloud 镜像加速器
 DAOCLOUD_MIRROR="docker.m.daocloud.io"
 
+# Docker build 代理设置 (用于容器内访问外网)
+DOCKER_BUILD_PROXY="http://host.internal:7890"
+
 # 需要预拉取的基础镜像列表
 declare -A BASE_IMAGES
 BASE_IMAGES=(
@@ -257,7 +260,10 @@ build_maven() {
     # 再构建 Docker 镜像
     if [ -f "Dockerfile" ]; then
         log_info "构建 Docker 镜像: $service"
-        docker build -t "${service}:latest" .
+        docker build \
+            --build-arg http_proxy="${DOCKER_BUILD_PROXY}" \
+            --build-arg https_proxy="${DOCKER_BUILD_PROXY}" \
+            -t "${service}:latest" .
     else
         log_warn "没有找到 Dockerfile，跳过镜像构建"
     fi
@@ -275,7 +281,10 @@ build_gradle() {
     # 再构建 Docker 镜像
     if [ -f "Dockerfile" ]; then
         log_info "构建 Docker 镜像: $service"
-        docker build -t "${service}:latest" .
+        docker build \
+            --build-arg http_proxy="${DOCKER_BUILD_PROXY}" \
+            --build-arg https_proxy="${DOCKER_BUILD_PROXY}" \
+            -t "${service}:latest" .
     else
         log_warn "没有找到 Dockerfile，跳过镜像构建"
     fi
@@ -297,7 +306,10 @@ build_go() {
     # 再构建 Docker 镜像
     if [ -f "Dockerfile" ]; then
         log_info "构建 Docker 镜像: $service"
-        docker build -t "${service}:latest" .
+        docker build \
+            --build-arg http_proxy="${DOCKER_BUILD_PROXY}" \
+            --build-arg https_proxy="${DOCKER_BUILD_PROXY}" \
+            -t "${service}:latest" .
     else
         log_warn "没有找到 Dockerfile，跳过镜像构建"
     fi
@@ -316,7 +328,10 @@ build_node() {
     # 再构建 Docker 镜像
     if [ -f "Dockerfile" ]; then
         log_info "构建 Docker 镜像: $service"
-        docker build -t "${service}:latest" .
+        docker build \
+            --build-arg http_proxy="${DOCKER_BUILD_PROXY}" \
+            --build-arg https_proxy="${DOCKER_BUILD_PROXY}" \
+            -t "${service}:latest" .
     else
         log_warn "没有找到 Dockerfile，跳过镜像构建"
     fi
