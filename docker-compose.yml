@@ -57,7 +57,7 @@ services:
     networks:
       - bifu-network
     healthcheck:
-      test: ["CMD", "sh", "-c", "echo 'health check' | nc localhost 9876 || exit 1"]
+      test: ["CMD", "sh", "-c", "ps aux | grep -v grep | grep 'org.apache.rocketmq.namesrv.NamesrvStartup' || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
