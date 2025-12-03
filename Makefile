@@ -133,8 +133,12 @@ market-maker-server:
 	cd market-maker-server && go mod vendor && make mac
 
 # 编译所有 Node.js 项目
-node-projects: decode-web-admin
+node-projects: decode-web decode-web-admin
 	@echo "所有 Node.js 项目编译完成"
+
+decode-web:
+	@echo "编译 decode-web..."
+	cd decode-web && npm run build:production
 
 decode-web-admin:
 	@echo "编译 decode-web-admin..."
@@ -151,5 +155,6 @@ clean:
 	@find . -type d -name "vendor" -prune -exec rm -rf {} + 2>/dev/null || true
 	@cd market-maker-server && make clean 2>/dev/null || true
 	@echo "清理 Node.js 项目..."
+	@cd decode-web && rm -rf dist 2>/dev/null || true
 	@cd decode-web-admin && rm -rf dist 2>/dev/null || true
 	@echo "清理完成！"
