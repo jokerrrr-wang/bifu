@@ -1,9 +1,37 @@
-.PHONY: all clean help maven-projects gradle-projects go-projects node-projects jraft
+.PHONY: all clean help maven-projects gradle-projects go-projects node-projects jraft decode-web decode-web-admin
 
 # 默认目标：编译所有工程
 all: jraft maven-projects gradle-projects go-projects node-projects
 	@echo "=========================================="
 	@echo "所有工程编译完成！"
+	@echo "=========================================="
+	@echo ""
+	@echo "📦 构建产物统计"
+	@echo "=========================================="
+	@echo ""
+	@echo "🔹 sofa-jraft:"
+	@[ -f sofa-jraft/jraft-core/target/jraft-core-1.4.0.jar ] && \
+		ls -lh sofa-jraft/jraft-core/target/jraft-core-1.4.0.jar | awk '{print "  ✓ " $$9 " (" $$5 ")"}' || true
+	@echo ""
+	@echo "🔹 Maven 项目 (共用库):"
+	@[ -f unimargin-protos/target/unimargin-protos-1.0.2-SNAPSHOT.jar ] && \
+		ls -lh unimargin-protos/target/unimargin-protos-1.0.2-SNAPSHOT.jar | awk '{print "  ✓ unimargin-protos (" $$5 ")"}' || true
+	@[ -f unimargin-common/target/unimargin-common-2.0.0-SNAPSHOT.jar ] && \
+		ls -lh unimargin-common/target/unimargin-common-2.0.0-SNAPSHOT.jar | awk '{print "  ✓ unimargin-common (" $$5 ")"}' || true
+	@echo "  ✓ 其他服务已编译到各自的 target/ 目录"
+	@echo ""
+	@echo "🔹 Gradle 项目:"
+	@[ -f unimargin-activity-server/build/libs/unimargin-activity-server-1.0.0-SNAPSHOT.jar ] && \
+		ls -lh unimargin-activity-server/build/libs/unimargin-activity-server-1.0.0-SNAPSHOT.jar | awk '{print "  ✓ " $$9 " (" $$5 ")"}' || true
+	@echo ""
+	@echo "🔹 Go 可执行文件:"
+	@[ -d market-maker-server/bin ] && \
+		ls -lh market-maker-server/bin/* 2>/dev/null | grep -v "total" | awk '{print "  ✓ " $$9 " (" $$5 ")"}' || true
+	@echo ""
+	@echo "🔹 Node.js 项目:"
+	@[ -d decode-web/dist ] && echo "  ✓ decode-web/dist/ ($$(du -sh decode-web/dist 2>/dev/null | awk '{print $$1}'))" || true
+	@[ -d decode-web-admin/dist ] && echo "  ✓ decode-web-admin/dist/ ($$(du -sh decode-web-admin/dist 2>/dev/null | awk '{print $$1}'))" || true
+	@echo ""
 	@echo "=========================================="
 
 # 帮助信息
