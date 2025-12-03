@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/opt/homebrew/bin/bash
 # docker-compose-all.sh - 统一的 Docker 服务构建和管理脚本
 # 用法:
 #   ./docker-compose-all.sh build [service]   - 构建 Docker 镜像
@@ -19,57 +19,57 @@ cd "$PROJECT_ROOT"
 DAOCLOUD_MIRROR="docker.m.daocloud.io"
 
 # 需要预拉取的基础镜像列表
-typeset -A BASE_IMAGES
+declare -A BASE_IMAGES
 BASE_IMAGES=(
     # JDK 镜像 (Maven/Gradle 项目)
-    "eclipse-temurin:17.0.11_9-jdk-jammy" "library/eclipse-temurin:17.0.11_9-jdk-jammy"
-    "eclipse-temurin:17-jdk-jammy" "library/eclipse-temurin:17-jdk-jammy"
+    ["eclipse-temurin:17.0.11_9-jdk-jammy"]="library/eclipse-temurin:17.0.11_9-jdk-jammy"
+    ["eclipse-temurin:17-jdk-jammy"]="library/eclipse-temurin:17-jdk-jammy"
     # Node.js 镜像
-    "node:18.19-alpine3.19" "library/node:18.19-alpine3.19"
-    "node:18-alpine" "library/node:18-alpine"
+    ["node:18.19-alpine3.19"]="library/node:18.19-alpine3.19"
+    ["node:18-alpine"]="library/node:18-alpine"
     # Go 镜像
-    "golang:alpine" "library/golang:alpine"
-    "golang:1.21-alpine" "library/golang:1.21-alpine"
+    ["golang:alpine"]="library/golang:alpine"
+    ["golang:1.21-alpine"]="library/golang:1.21-alpine"
     # Alpine 基础镜像
-    "alpine:latest" "library/alpine:latest"
-    "alpine:3.19" "library/alpine:3.19"
+    ["alpine:latest"]="library/alpine:latest"
+    ["alpine:3.19"]="library/alpine:3.19"
 )
 
 # 定义所有服务及其类型
 # 格式: "服务名:类型" - 类型: maven, gradle, go, node
-typeset -A SERVICES
+declare -A SERVICES
 SERVICES=(
     # 基础组件 (仅编译，不构建镜像)
-    unimargin-protos proto
-    unimargin-common maven-lib
-    sofa-jraft maven-lib
+    ["unimargin-protos"]="proto"
+    ["unimargin-common"]="maven-lib"
+    ["sofa-jraft"]="maven-lib"
     
     # Maven 项目
-    decode-admin-server maven
-    spot-trade-proxy maven
-    spot-trade-server maven
-    unimargin-funding-server maven
-    unimargin-grpc-gateway maven
-    unimargin-history-server maven
-    unimargin-http-gateway maven
-    unimargin-index-server maven
-    unimargin-liquidate-server maven
-    unimargin-match-server maven
-    unimargin-quote-proxy maven
-    unimargin-quote-server maven
-    unimargin-trade-proxy maven
-    unimargin-trade-server maven
-    unimargin-websocket-gateway maven
+    ["decode-admin-server"]="maven"
+    ["spot-trade-proxy"]="maven"
+    ["spot-trade-server"]="maven"
+    ["unimargin-funding-server"]="maven"
+    ["unimargin-grpc-gateway"]="maven"
+    ["unimargin-history-server"]="maven"
+    ["unimargin-http-gateway"]="maven"
+    ["unimargin-index-server"]="maven"
+    ["unimargin-liquidate-server"]="maven"
+    ["unimargin-match-server"]="maven"
+    ["unimargin-quote-proxy"]="maven"
+    ["unimargin-quote-server"]="maven"
+    ["unimargin-trade-proxy"]="maven"
+    ["unimargin-trade-server"]="maven"
+    ["unimargin-websocket-gateway"]="maven"
     
     # Gradle 项目
-    unimargin-activity-server gradle
+    ["unimargin-activity-server"]="gradle"
     
     # Go 项目
-    market-maker-server go
+    ["market-maker-server"]="go"
     
     # Node.js 项目
-    decode-web node
-    decode-web-admin node
+    ["decode-web"]="node"
+    ["decode-web-admin"]="node"
 )
 
 # 服务构建顺序 (基础组件优先)
@@ -159,7 +159,7 @@ pull_all_base_images() {
     local failed_images=()
     local success_count=0
     
-    for image in "${(@k)BASE_IMAGES}"; do
+    for image in "${!BASE_IMAGES[@]}"; do
         if pull_image_via_daocloud "$image"; then
             success_count=$((success_count + 1))
         else
@@ -257,7 +257,7 @@ build_maven() {
     # 再构建 Docker 镜像
     if [ -f "Dockerfile" ]; then
         log_info "构建 Docker 镜像: $service"
-        docker build -t "$service:latest" .
+        docker build -t "${service}:latest" .
     else
         log_warn "没有找到 Dockerfile，跳过镜像构建"
     fi
@@ -275,7 +275,7 @@ build_gradle() {
     # 再构建 Docker 镜像
     if [ -f "Dockerfile" ]; then
         log_info "构建 Docker 镜像: $service"
-        docker build -t "$service:latest" .
+        docker build -t "${service}:latest" .
     else
         log_warn "没有找到 Dockerfile，跳过镜像构建"
     fi
@@ -297,7 +297,7 @@ build_go() {
     # 再构建 Docker 镜像
     if [ -f "Dockerfile" ]; then
         log_info "构建 Docker 镜像: $service"
-        docker build -t "$service:latest" .
+        docker build -t "${service}:latest" .
     else
         log_warn "没有找到 Dockerfile，跳过镜像构建"
     fi
@@ -316,7 +316,7 @@ build_node() {
     # 再构建 Docker 镜像
     if [ -f "Dockerfile" ]; then
         log_info "构建 Docker 镜像: $service"
-        docker build -t "$service:latest" .
+        docker build -t "${service}:latest" .
     else
         log_warn "没有找到 Dockerfile，跳过镜像构建"
     fi
@@ -396,10 +396,65 @@ build_all() {
         done
     fi
     
+    # 统一镜像标签
+    echo ""
+    normalize_image_tags
+    
     # 显示 Docker 镜像列表
     echo ""
     log_info "当前 Docker 镜像:"
     docker images | grep -E "(unimargin|decode|spot|market|sofa)" | head -30 || true
+}
+
+# 统一镜像标签 - 为所有 SNAPSHOT 版本创建 latest 标签
+normalize_image_tags() {
+    log_info "检查并统一镜像标签为 latest..."
+    echo ""
+    
+    local services_to_tag=(
+        "decode-admin-server"
+        "decode-web"
+        "decode-web-admin"
+        "market-maker-server"
+        "spot-trade-proxy"
+        "spot-trade-server"
+        "unimargin-activity-server"
+        "unimargin-funding-server"
+        "unimargin-grpc-gateway"
+        "unimargin-history-server"
+        "unimargin-http-gateway"
+        "unimargin-index-server"
+        "unimargin-liquidate-server"
+        "unimargin-match-server"
+        "unimargin-quote-proxy"
+        "unimargin-quote-server"
+        "unimargin-trade-proxy"
+        "unimargin-trade-server"
+        "unimargin-websocket-gateway"
+    )
+    
+    local tagged_count=0
+    
+    for service in "${services_to_tag[@]}"; do
+        # 检查是否已有 latest 标签
+        if docker image inspect "${service}:latest" &>/dev/null; then
+            continue
+        fi
+        
+        # 检查是否有 SNAPSHOT 版本的镜像，如果有则创建 latest 别名
+        local snapshot_image=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep "^${service}:.*SNAPSHOT$" | head -1)
+        if [ -n "$snapshot_image" ]; then
+            docker tag "$snapshot_image" "${service}:latest" 2>/dev/null && \
+                log_info "✓ ${snapshot_image} -> ${service}:latest" && \
+                tagged_count=$((tagged_count + 1))
+        fi
+    done
+    
+    if [ $tagged_count -gt 0 ]; then
+        log_info "共标记 $tagged_count 个镜像为 latest"
+    else
+        log_info "所有镜像已是 latest 标签，无需处理"
+    fi
 }
 
 # 启动服务
@@ -412,8 +467,47 @@ start_service() {
         docker-compose up -d
     else
         # 使用默认配置启动
-        docker run -d --name "$service" "$service:latest"
+        docker run -d --name "$service" "${service}:latest"
     fi
+}
+
+# 启动所有服务
+start_all() {
+    log_info "启动所有服务..."
+    local failed_services=()
+    local count=0
+    
+    for service in "${BUILD_ORDER[@]}"; do
+        local type=${SERVICES[$service]}
+        # 跳过基础组件（proto 和 maven-lib）
+        if [ "$type" != "proto" ] && [ "$type" != "maven-lib" ]; then
+            echo ""
+            log_step "启动 ($((++count))): $service"
+            
+            if ! start_service "$service"; then
+                failed_services+=("$service")
+                log_error "启动失败: $service"
+            fi
+        fi
+    done
+    
+    echo ""
+    echo "========================================"
+    log_info "启动完成摘要"
+    echo "========================================"
+    
+    if [ ${#failed_services[@]} -eq 0 ]; then
+        log_info "所有服务启动成功!"
+    else
+        log_error "以下服务启动失败:"
+        for s in "${failed_services[@]}"; do
+            echo "  - $s"
+        done
+    fi
+    
+    # 显示服务状态
+    echo ""
+    status_all
 }
 
 # 停止服务
@@ -491,7 +585,7 @@ main() {
             if [ -n "$service" ]; then
                 start_service "$service"
             else
-                log_error "请指定要启动的服务"
+                start_all
             fi
             ;;
         stop)
@@ -522,24 +616,84 @@ main() {
         list)
             list_services
             ;;
-        help|*)
-            echo "用法: $0 {build|pull-images|start|stop|restart|status|logs|list} [service]"
+        # 统一 docker-compose 命令
+        up)
+            log_info "使用统一的 docker-compose.yml 启动所有服务..."
+            cd "$PROJECT_ROOT"
+            if [ -n "$service" ]; then
+                docker-compose up -d "$service"
+            else
+                docker-compose up -d
+            fi
             echo ""
-            echo "命令:"
+            docker-compose ps
+            ;;
+        down)
+            log_info "使用统一的 docker-compose.yml 停止所有服务..."
+            cd "$PROJECT_ROOT"
+            if [ -n "$service" ]; then
+                docker-compose stop "$service"
+                docker-compose rm -f "$service"
+            else
+                docker-compose down
+            fi
+            ;;
+        up-infra)
+            log_info "仅启动中间件服务..."
+            cd "$PROJECT_ROOT"
+            docker-compose up -d rocketmq-namesrv rocketmq-broker rocketmq-dashboard redis mysql xxl-job-admin
+            echo ""
+            docker-compose ps
+            ;;
+        up-services)
+            log_info "启动所有业务服务 (需要先启动中间件)..."
+            cd "$PROJECT_ROOT"
+            docker-compose up -d decode-admin-server spot-trade-proxy spot-trade-server \
+                unimargin-funding-server unimargin-grpc-gateway unimargin-http-gateway \
+                unimargin-history-server unimargin-index-server unimargin-liquidate-server \
+                unimargin-match-server unimargin-quote-proxy unimargin-quote-server \
+                unimargin-trade-proxy unimargin-trade-server unimargin-websocket-gateway \
+                unimargin-activity-server market-maker-server decode-web decode-web-admin
+            echo ""
+            docker-compose ps
+            ;;
+        ps)
+            cd "$PROJECT_ROOT"
+            docker-compose ps
+            ;;
+        tag)
+            normalize_image_tags
+            ;;
+        help|*)
+            echo "用法: $0 {build|pull-images|start|stop|restart|status|logs|list|tag|up|down|up-infra|up-services|ps} [service]"
+            echo ""
+            echo "传统命令 (每个服务独立 docker-compose):"
             echo "  build [service]   - 构建 Docker 镜像 (不指定则构建所有)"
             echo "  pull-images       - 通过 DaoCloud 拉取所有基础镜像"
-            echo "  start <service>   - 启动指定服务"
+            echo "  tag               - 统一镜像标签为 latest"
+            echo "  start [service]   - 启动服务 (不指定则启动所有)"
             echo "  stop [service]    - 停止服务 (不指定则停止所有)"
             echo "  restart <service> - 重启指定服务"
             echo "  status            - 查看所有服务状态"
             echo "  logs <service>    - 查看服务日志"
             echo "  list              - 列出所有可用服务"
             echo ""
+            echo "统一 docker-compose 命令 (推荐):"
+            echo "  up [service]      - 启动所有/指定服务 (使用统一配置)"
+            echo "  down [service]    - 停止所有/指定服务"
+            echo "  up-infra          - 仅启动中间件 (RocketMQ/Redis/MySQL)"
+            echo "  up-services       - 仅启动业务服务"
+            echo "  ps                - 查看服务状态"
+            echo ""
             echo "示例:"
-            echo "  $0 pull-images               # 拉取所有基础镜像"
-            echo "  $0 build                     # 构建所有服务"
-            echo "  $0 build unimargin-match-server  # 构建指定服务"
-            echo "  $0 status                    # 查看状态"
+            echo "  $0 build                      # 构建所有服务"
+            echo "  $0 tag                        # 统一镜像标签为 latest"
+            echo "  $0 up-infra                   # 先启动中间件"
+            echo "  $0 up-services                # 再启动业务服务"
+            echo "  $0 up                         # 一键启动所有服务"
+            echo "  $0 up decode-admin-server     # 启动指定服务"
+            echo "  $0 down                       # 停止所有服务"
+            echo "  $0 ps                         # 查看状态"
             ;;
     esac
 }

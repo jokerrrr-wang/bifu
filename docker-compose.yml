@@ -1,0 +1,423 @@
+# 统一的 Docker Compose 配置文件
+# 包含所有共享中间件和微服务
+
+networks:
+  bifu-network:
+    driver: bridge
+    name: bifu-network
+
+volumes:
+  mysql-data:
+  redis-data:
+  rocketmq-namesrv-logs:
+  rocketmq-namesrv-store:
+  rocketmq-broker-logs:
+  rocketmq-broker-store:
+
+services:
+  # ==================== 中间件 ====================
+  
+  # RocketMQ NameServer
+  rocketmq-namesrv:
+    container_name: rocketmq-namesrv
+    image: "dyrnq/rocketmq:5.1.0"
+    environment:
+      JAVA_OPT_EXT: "-Duser.home=/home/rocketmq -Xms512m -Xmx512m -Xmn128m -XX:MetaspaceSize=128m -XX:MaxMetaspaceSize=128m"
+    command: "sh mqnamesrv"
+    ports:
+      - "9876:9876"
+    volumes:
+      - rocketmq-namesrv-logs:/home/rocketmq/logs
+      - rocketmq-namesrv-store:/home/rocketmq/store
+    networks:
+      - bifu-network
+    healthcheck:
+      test: ["CMD", "sh", "-c", "echo 'health check' | nc localhost 9876 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # RocketMQ Broker
+  rocketmq-broker:
+    container_name: rocketmq-broker
+    image: "dyrnq/rocketmq:5.1.0"
+    environment:
+      JAVA_OPT_EXT: "-Duser.home=/home/rocketmq -Xms512m -Xmx512m -Xmn128m -XX:MetaspaceSize=128m -XX:MaxMetaspaceSize=128m"
+      NAMESRV_ADDR: rocketmq-namesrv:9876
+    command: "sh mqbroker -n rocketmq-namesrv:9876 autoCreateTopicEnable=true"
+    ports:
+      - "10909:10909"
+      - "10911:10911"
+      - "10912:10912"
+    volumes:
+      - rocketmq-broker-logs:/home/rocketmq/logs
+      - rocketmq-broker-store:/home/rocketmq/store
+    depends_on:
+      - rocketmq-namesrv
+    networks:
+      - bifu-network
+
+  # RocketMQ Dashboard
+  rocketmq-dashboard:
+    container_name: rocketmq-dashboard
+    image: apacherocketmq/rocketmq-dashboard:latest
+    environment:
+      JAVA_OPTS: "-Drocketmq.namesrv.addr=rocketmq-namesrv:9876"
+    ports:
+      - "8081:8080"
+    depends_on:
+      - rocketmq-namesrv
+      - rocketmq-broker
+    networks:
+      - bifu-network
+
+  # Redis
+  redis:
+    container_name: redis
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - bifu-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # MySQL
+  mysql:
+    container_name: mysql
+    image: "mysql:8.0-oracle"
+    environment:
+      MYSQL_ROOT_PASSWORD: root123456
+      MYSQL_DATABASE: bifu
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    networks:
+      - bifu-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # XXL-Job Admin
+  xxl-job-admin:
+    container_name: xxl-job-admin
+    image: "xuxueli/xxl-job-admin:2.4.0"
+    environment:
+      PARAMS: "--spring.datasource.url=jdbc:mysql://mysql:3306/xxl_job?useUnicode=true&characterEncoding=UTF-8&autoReconnect=true&serverTimezone=Asia/Shanghai --spring.datasource.username=root --spring.datasource.password=root123456"
+    ports:
+      - "8082:8080"
+    depends_on:
+      - mysql
+    networks:
+      - bifu-network
+
+  # ==================== 业务服务 ====================
+  
+  # decode-admin-server
+  decode-admin-server:
+    container_name: decode-admin-server
+    image: "decode-admin-server:latest"
+    environment:
+      SPRING_PROFILES_ACTIVE: "localtest"
+      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/bifu?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai"
+      SPRING_REDIS_HOST: "redis"
+    ports:
+      - "8080:8080"
+    depends_on:
+      - mysql
+      - redis
+    networks:
+      - bifu-network
+
+  # spot-trade-proxy
+  spot-trade-proxy:
+    container_name: spot-trade-proxy
+    image: "spot-trade-proxy:latest"
+    environment:
+      SPRING_PROFILES_ACTIVE: "localtest"
+      JVM_OPT_XMX: "512m"
+      JVM_OPT_XMS: "256m"
+      SoftMaxHeapSize: "384m"
+    ports:
+      - "9002:9002"
+    networks:
+      - bifu-network
+
+  # spot-trade-server
+  spot-trade-server:
+    container_name: spot-trade-server
+    image: "spot-trade-server:latest"
+    environment:
+      SPRING_PROFILES_ACTIVE: "localtest"
+      ROCKETMQ_NAMESRV_ADDR: "rocketmq-namesrv:9876"
+      JVM_OPT_XMX: "512m"
+      JVM_OPT_XMS: "256m"
+      SoftMaxHeapSize: "384m"
+    ports:
+      - "9001:9001"
+    depends_on:
+      - rocketmq-namesrv
+      - rocketmq-broker
+    networks:
+      - bifu-network
+
+  # unimargin-funding-server
+  unimargin-funding-server:
+    container_name: unimargin-funding-server
+    image: "unimargin-funding-server:latest"
+    environment:
+      SPRING_PROFILES_ACTIVE: "localtest"
+      ROCKETMQ_NAMESRV_ADDR: "rocketmq-namesrv:9876"
+      JVM_OPT_XMX: "512m"
+      JVM_OPT_XMS: "256m"
+      SoftMaxHeapSize: "384m"
+    ports:
+      - "9010:9010"
+    depends_on:
+      - rocketmq-namesrv
+      - rocketmq-broker
+    networks:
+      - bifu-network
+
+  # unimargin-grpc-gateway
+  unimargin-grpc-gateway:
+    container_name: unimargin-grpc-gateway
+    image: "unimargin-grpc-gateway:latest"
+    environment:
+      SPRING_PROFILES_ACTIVE: "localtest"
+      JVM_OPT_XMX: "512m"
+      JVM_OPT_XMS: "256m"
+      SoftMaxHeapSize: "384m"
+    ports:
+      - "9020:9020"
+    networks:
+      - bifu-network
+
+  # unimargin-http-gateway
+  unimargin-http-gateway:
+    container_name: unimargin-http-gateway
+    image: "unimargin-http-gateway:latest"
+    environment:
+      SPRING_PROFILES_ACTIVE: "localtest"
+      SPRING_REDIS_HOST: "redis"
+      ROCKETMQ_NAMESRV_ADDR: "rocketmq-namesrv:9876"
+      JVM_OPT_XMX: "512m"
+      JVM_OPT_XMS: "256m"
+      SoftMaxHeapSize: "384m"
+    ports:
+      - "9021:9021"
+    depends_on:
+      - redis
+      - rocketmq-namesrv
+    networks:
+      - bifu-network
+
+  # unimargin-history-server
+  unimargin-history-server:
+    container_name: unimargin-history-server
+    image: "unimargin-history-server:latest"
+    environment:
+      SPRING_PROFILES_ACTIVE: "localtest"
+      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/bifu?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai"
+      SPRING_REDIS_HOST: "redis"
+      ROCKETMQ_NAMESRV_ADDR: "rocketmq-namesrv:9876"
+      JVM_OPT_XMX: "512m"
+      JVM_OPT_XMS: "256m"
+      SoftMaxHeapSize: "384m"
+    ports:
+      - "9030:9030"
+    depends_on:
+      - mysql
+      - redis
+      - rocketmq-namesrv
+    networks:
+      - bifu-network
+
+  # unimargin-index-server
+  unimargin-index-server:
+    container_name: unimargin-index-server
+    image: "unimargin-index-server:latest"
+    environment:
+      SPRING_PROFILES_ACTIVE: "localtest"
+      ROCKETMQ_NAMESRV_ADDR: "rocketmq-namesrv:9876"
+      JVM_OPT_XMX: "512m"
+      JVM_OPT_XMS: "256m"
+      SoftMaxHeapSize: "384m"
+    ports:
+      - "9040:9040"
+    depends_on:
+      - rocketmq-namesrv
+      - rocketmq-broker
+    networks:
+      - bifu-network
+
+  # unimargin-liquidate-server
+  unimargin-liquidate-server:
+    container_name: unimargin-liquidate-server
+    image: "unimargin-liquidate-server:latest"
+    environment:
+      SPRING_PROFILES_ACTIVE: "localtest"
+      ROCKETMQ_NAMESRV_ADDR: "rocketmq-namesrv:9876"
+      JVM_OPT_XMX: "512m"
+      JVM_OPT_XMS: "256m"
+      SoftMaxHeapSize: "384m"
+    ports:
+      - "9050:9050"
+    depends_on:
+      - rocketmq-namesrv
+      - rocketmq-broker
+    networks:
+      - bifu-network
+
+  # unimargin-match-server
+  unimargin-match-server:
+    container_name: unimargin-match-server
+    image: "unimargin-match-server:latest"
+    environment:
+      SPRING_PROFILES_ACTIVE: "localtest"
+      ROCKETMQ_NAMESRV_ADDR: "rocketmq-namesrv:9876"
+      JVM_OPT_XMX: "512m"
+      JVM_OPT_XMS: "256m"
+      SoftMaxHeapSize: "384m"
+    ports:
+      - "9060:9060"
+    depends_on:
+      - rocketmq-namesrv
+      - rocketmq-broker
+    networks:
+      - bifu-network
+
+  # unimargin-quote-proxy
+  unimargin-quote-proxy:
+    container_name: unimargin-quote-proxy
+    image: "unimargin-quote-proxy:latest"
+    environment:
+      SPRING_PROFILES_ACTIVE: "localtest"
+      JVM_OPT_XMX: "512m"
+      JVM_OPT_XMS: "256m"
+      SoftMaxHeapSize: "384m"
+    ports:
+      - "9071:9071"
+    networks:
+      - bifu-network
+
+  # unimargin-quote-server
+  unimargin-quote-server:
+    container_name: unimargin-quote-server
+    image: "unimargin-quote-server:latest"
+    environment:
+      SPRING_PROFILES_ACTIVE: "localtest"
+      ROCKETMQ_NAMESRV_ADDR: "rocketmq-namesrv:9876"
+      JVM_OPT_XMX: "512m"
+      JVM_OPT_XMS: "256m"
+      SoftMaxHeapSize: "384m"
+    ports:
+      - "9070:9070"
+    depends_on:
+      - rocketmq-namesrv
+      - rocketmq-broker
+    networks:
+      - bifu-network
+
+  # unimargin-trade-proxy
+  unimargin-trade-proxy:
+    container_name: unimargin-trade-proxy
+    image: "unimargin-trade-proxy:latest"
+    environment:
+      SPRING_PROFILES_ACTIVE: "localtest"
+      JVM_OPT_XMX: "512m"
+      JVM_OPT_XMS: "256m"
+      SoftMaxHeapSize: "384m"
+    ports:
+      - "9081:9081"
+    networks:
+      - bifu-network
+
+  # unimargin-trade-server
+  unimargin-trade-server:
+    container_name: unimargin-trade-server
+    image: "unimargin-trade-server:latest"
+    environment:
+      SPRING_PROFILES_ACTIVE: "localtest"
+      ROCKETMQ_NAMESRV_ADDR: "rocketmq-namesrv:9876"
+      JVM_OPT_XMX: "512m"
+      JVM_OPT_XMS: "256m"
+      SoftMaxHeapSize: "384m"
+    ports:
+      - "9080:9080"
+    depends_on:
+      - rocketmq-namesrv
+      - rocketmq-broker
+    networks:
+      - bifu-network
+
+  # unimargin-websocket-gateway
+  unimargin-websocket-gateway:
+    container_name: unimargin-websocket-gateway
+    image: "unimargin-websocket-gateway:latest"
+    environment:
+      SPRING_PROFILES_ACTIVE: "localtest"
+      ROCKETMQ_NAMESRV_ADDR: "rocketmq-namesrv:9876"
+      JVM_OPT_XMX: "512m"
+      JVM_OPT_XMS: "256m"
+      SoftMaxHeapSize: "384m"
+    ports:
+      - "9090:9090"
+    depends_on:
+      - rocketmq-namesrv
+      - rocketmq-broker
+    networks:
+      - bifu-network
+
+  # unimargin-activity-server
+  unimargin-activity-server:
+    container_name: unimargin-activity-server
+    image: "unimargin-activity-server:latest"
+    environment:
+      SPRING_PROFILES_ACTIVE: "localtest"
+      JVM_OPT_XMX: "512m"
+      JVM_OPT_XMS: "256m"
+      SoftMaxHeapSize: "384m"
+    ports:
+      - "9100:9100"
+    networks:
+      - bifu-network
+
+  # market-maker-server
+  market-maker-server:
+    container_name: market-maker-server
+    image: "market-maker-server:latest"
+    environment:
+      ENV: "localtest"
+    ports:
+      - "9110:9110"
+    networks:
+      - bifu-network
+
+  # decode-web
+  decode-web:
+    container_name: decode-web
+    image: "decode-web:latest"
+    ports:
+      - "3000:3000"
+    networks:
+      - bifu-network
+
+  # decode-web-admin
+  decode-web-admin:
+    container_name: decode-web-admin
+    image: "decode-web-admin:latest"
+    ports:
+      - "3001:3001"
+    networks:
+      - bifu-network
